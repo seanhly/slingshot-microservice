@@ -1,23 +1,28 @@
 # `slingshot-microservice`: A Rust framework for standard microservice design
 
+![](./docs/icons/512x512/slingshot-microservice.png)
+
 `slingshot-microservice` is a Rust package that provides a simple, opinionated
 framework for building microservices.  The framework makes the following
 assumptions about a microservice:
 
-1. Microservices listens to incoming requests on a single queue (RabbitMQ).
-2. Incoming requests are in the form of a 64-bit unsigned integer (enough
-   granularity to work as a resource identifier or ID).
+1. A microservice listens to incoming requests on its own dedicated and
+   singular queue (RabbitMQ).
+2. Incoming requests are in the form of a 64-bit unsigned integer (`u64`).
 2. Microservices process requests via a `process` function, which takes one
    argument: the incoming request (`u64`).
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
    with a "case variable" that is used for routing the result to the
    appropriate outbound queues.
-4. Rather than hard-coding the inbound and outbound RabbitMQ queues, the
-   microservice communicates with a configuration service, which provides the
-   inbound queue name, as well as any outbound queues and their corresponding case variables.
-5. RabbitMQ is also configured automatically via the configuration service
-   (i.e. host, port, username, password are all provided by the configuration service).
+4. Rather than hard-coding the inbound and outbound queues, the
+   microservice communicates with a self-contained configuration service shared
+   across all microservices.
+   i.  This service provides inbound queue name, as well as any outbound queues
+       and their corresponding case variables.
+   ii. It is also responsible for providing the RabbitMQ connection details
+	   (host, port, username, password), and any bucket names if using S3 for
+	   storage.
 
 The `slingshot-microservice` framework handles setting up the RabbitMQ
 connection, listening to the inbound queue and routing results based on case variables.
@@ -47,10 +52,10 @@ fn main() {
 
 ## How it works:
 
-The configuration service responds to requests of the form:s
-`https://{HOSTNAME}/{MICROSERVICE_NAME}` with a JSON object that contains the
-inbound queue name and a mapping of case variables to outbound queue names.
-For example:
+The configuration service responds to requests of the form:
+`https://{HOSTNAME}/{MICROSERVICE_NAME}`.  All configuration is done over HTTP
+GET. The response contains a JSON object with two fields: an inbound queue name
+and a mapping of case variables to outbound queue names. For example:
 
 ```json
 {
@@ -98,7 +103,7 @@ function, which returns a set of tuples of the form `(result_id, case_variable)`
 The microservice then routes each `result_id` to the appropriate outbound
 queue(s) based on the `case_variable`, using a process that looks like this:
 
-Pseudocode:
+Peudocode:
 ```
 for each (result_id, case_variable) in process(request):
     for each outbound_queue in config.out[case_variable]:
