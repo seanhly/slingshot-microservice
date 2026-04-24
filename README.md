@@ -1,6 +1,6 @@
 # `slingshot-microservice`: A Rust framework for standard microservice design
 
-![](./docs/icons/512x512/slingshot-microservice.png)
+![](./docs/icons/256x256/slingshot-microservice.png)
 
 `slingshot-microservice` is a Rust package that provides a simple, opinionated
 framework for building microservices.  The framework makes the following
