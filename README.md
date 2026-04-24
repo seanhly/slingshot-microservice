@@ -27,6 +27,21 @@ assumptions about a microservice:
 The `slingshot-microservice` framework handles setting up the RabbitMQ
 connection, listening to the inbound queue and routing results based on case variables.
 
+## Adding The Framework To Your Project
+
+Add `slingshot-microservice` to your `Cargo.toml` dependencies directly from Codeberg:
+
+```toml
+[dependencies]
+slingshot-microservice = { git = "https://codeberg.org/seanhly/slingshot-microservice" }
+```
+
+Then fetch and build dependencies:
+
+```bash
+cargo build
+```
+
 ## Example Usage
 
 ```rust
