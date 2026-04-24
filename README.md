@@ -9,8 +9,9 @@ assumptions about a microservice:
 1. A microservice listens to incoming requests on its own dedicated and
    singular queue (RabbitMQ).
 2. Incoming requests are in the form of a 64-bit unsigned integer (`u64`).
-2. Microservices process requests via a `process` function, which takes one
-   argument: the incoming request (`u64`).
+2. Microservices process requests via a `process` function, which takes three
+    arguments: the incoming request (`u64`), a `read_file` function, and a
+    `write_file` function.
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
    with a "case variable" that is used for routing the result to the
@@ -21,8 +22,8 @@ assumptions about a microservice:
    i.  This service provides inbound queue name, as well as any outbound queues
        and their corresponding case variables.
    ii. It is also responsible for providing the RabbitMQ connection details
-	   (host, port, username, password), and any bucket names if using S3 for
-	   storage.
+	   (host, port, username, password), and the object-storage host plus GNU
+	   `pass` references for the S3 access key and secret key.
 
 The `slingshot-microservice` framework handles setting up the RabbitMQ
 connection, listening to the inbound queue and routing results based on case variables.
@@ -46,10 +47,25 @@ cargo build
 
 ```rust
 use slingshot_microservice::Microservice;
+use slingshot_microservice::{ProcessFuture, ReadFileFn, WriteFileFn};
+use std::io::Write;
+use tokio::io::AsyncReadExt;
 
-fn process(request: u64) -> Vec<(u64, String)> {
-    // Example processing logic: return the request ID and a case variable
-    vec![(request, "case_a".to_string())]
+fn process<'a>(
+    request: u64,
+    read_file: &'a ReadFileFn,
+    write_file: &'a WriteFileFn,
+) -> ProcessFuture<'a, String> {
+    Box::pin(async move {
+        let mut input = String::new();
+        let mut reader = read_file("in", request)?;
+        reader.read_to_string(&mut input).await?;
+
+        let mut writer = write_file("out", request)?;
+        writer.write_all(input.as_bytes())?;
+
+        Ok(vec![(request, "case_a".to_string())])
+    })
 }
 
 fn main() {
@@ -111,12 +127,33 @@ to send results to based on a case variable that is either `false` or `true`:
 The configuration service also provides the RabbitMQ connection details (host,
 port, etc.):
 
+Object storage credentials are fetched separately from
+`https://sys-map.slingshot.cv/object-storage`. The access-key and secret-key
+values returned there are GNU `pass` entry names, so the runtime resolves the
+actual secrets with `pass show <key>` before constructing the S3 client.
+
 When the microservice first starts up, it makes a request to the configuration
 service to get the queue metadata.  Then it starts to listen to the inbound
 queue.  Inbound requests are processed by the user-programmed `process`
 function, which returns a set of tuples of the form `(result_id, case_variable)`.
-The microservice then routes each `result_id` to the appropriate outbound
-queue(s) based on the `case_variable`, using a process that looks like this:
+
+Within each `process` pass:
+
+1. `read_file(key, id)` treats `key` as a bucket reference such as `in`, not
+    as the canonical bucket name. On first use, the runtime fetches
+    `https://{HOSTNAME}/{MICROSERVICE_NAME}/{key}` to resolve the real bucket
+    name, caches that mapping, and then returns an async stream for object
+    `id` in that bucket using the AWS SDK (`get_object(...).body.into_async_read()`).
+2. `write_file(key, id)` resolves `key` through the same cached lookup and
+    returns an opened local file handle for writing, staging the output for
+    `s3://{resolved_bucket}/{id}`.
+3.  After `process` returns, opened files are closed.
+4.  Then staged write files are uploaded to S3 with the AWS SDK, local staged
+    files are deleted, and local temporary directories are removed.
+5.  Only after file finalization is complete are output IDs published to
+    outbound queues.
+
+The output queue routing step looks like this:
 
 Peudocode:
 ```
