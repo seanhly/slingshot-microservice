@@ -4,18 +4,20 @@
 framework for building microservices.  The framework makes the following
 assumptions about a microservice:
 
-1. Microservices listens to incoming requests on a RabbitMQ queue.
+1. Microservices listens to incoming requests on a single queue (RabbitMQ).
 2. Incoming requests are in the form of a 64-bit unsigned integer (enough
    granularity to work as a resource identifier or ID).
-2. Microservices process incoming requests via a `process` function, which
-   takes one argument: the incoming request (`u64`).
+2. Microservices process requests via a `process` function, which takes one
+   argument: the incoming request (`u64`).
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
    with a "case variable" that is used for routing the result to the
    appropriate outbound queues.
 4. Rather than hard-coding the inbound and outbound RabbitMQ queues, the
-   microservice communicates with a configuration service which provides the
+   microservice communicates with a configuration service, which provides the
    inbound queue name, as well as any outbound queues and their corresponding case variables.
+5. RabbitMQ is also configured automatically via the configuration service
+   (i.e. host, port, username, password are all provided by the configuration service).
 
 The `slingshot-microservice` framework handles setting up the RabbitMQ
 connection, listening to the inbound queue and routing results based on case variables.
@@ -60,7 +62,7 @@ For example:
         },
         {
             "case": "case_b",
-            "queue": ["case_b_outbound"]
+            "queues": ["case_b_outbound"]
         }
     ]
 }
@@ -80,11 +82,14 @@ to send results to based on a case variable that is either `false` or `true`:
         },
         {
             "case": true,
-            "queue": ["binary-classification-true-outbound"]
+            "queues": ["binary-classification-true-outbound"]
         }
     ]
 }
 ```
+
+The configuration service also provides the RabbitMQ connection details (host,
+port, etc.):
 
 When the microservice first starts up, it makes a request to the configuration
 service to get the queue metadata.  Then it starts to listen to the inbound
