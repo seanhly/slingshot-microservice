@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::future::Future;
 use std::fs::{self, File};
-use std::io::ErrorKind;
-use std::pin::Pin;
+use std::io::{Cursor, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -25,16 +23,15 @@ use lapin::{BasicProperties, Channel, Connection, ConnectionProperties};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use tokio::io::AsyncRead;
+use tokio::io::AsyncReadExt;
 use tracing_subscriber::EnvFilter;
 
 pub type AnyError = Box<dyn Error + Send + Sync + 'static>;
 
-pub type ReadStream = Pin<Box<dyn AsyncRead + Send + Unpin + 'static>>;
-pub type ReadFileFn = dyn Fn(&str, u64) -> Result<ReadStream, AnyError> + Send + Sync + 'static;
+pub type ReadFile = Box<dyn Read + Send + 'static>;
+pub type ReadFileFn = dyn Fn(&str, u64) -> Result<ReadFile, AnyError> + Send + Sync + 'static;
 pub type WriteFileFn = dyn Fn(&str, u64) -> Result<File, AnyError> + Send + Sync + 'static;
-pub type ProcessFuture<'a, C> = Pin<Box<dyn Future<Output = Result<Vec<(u64, C)>, AnyError>> + Send + 'a>>;
-type ProcessFn = dyn for<'a> Fn(u64, &'a ReadFileFn, &'a WriteFileFn) -> ProcessFuture<'a, Value>
+type ProcessFn = dyn Fn(u64, &ReadFileFn, &WriteFileFn) -> Result<Vec<(u64, Value)>, AnyError>
 	+ Send
 	+ Sync
 	+ 'static;
@@ -83,10 +80,7 @@ impl Microservice {
 	/// serializable primitive, such as `String`, `bool`, or integers.
 	pub fn new<F, C>(name: impl Into<String>, config_host: impl Into<String>, process: F) -> Self
 	where
-		F: for<'a> Fn(u64, &'a ReadFileFn, &'a WriteFileFn) -> ProcessFuture<'a, C>
-			+ Send
-			+ Sync
-			+ 'static,
+		F: Fn(u64, &ReadFileFn, &WriteFileFn) -> Result<Vec<(u64, C)>, AnyError> + Send + Sync + 'static,
 		C: Serialize + 'static,
 	{
 		init_tracing();
@@ -94,19 +88,16 @@ impl Microservice {
 			request: u64,
 			read_file: &ReadFileFn,
 			write_file: &WriteFileFn,
-		| -> ProcessFuture<'_, Value> {
-			let fut = process(request, read_file, write_file);
-			Box::pin(async move {
-				let outputs = fut.await?;
-				Ok(outputs
-					.into_iter()
-					.map(|(id, case)| {
-						let value = serde_json::to_value(case)
-							.expect("case variable must be serializable to JSON");
-						(id, value)
-					})
-					.collect())
-			})
+		| -> Result<Vec<(u64, Value)>, AnyError> {
+			let outputs = process(request, read_file, write_file)?;
+			Ok(outputs
+				.into_iter()
+				.map(|(id, case)| {
+					let value = serde_json::to_value(case)
+						.expect("case variable must be serializable to JSON");
+					(id, value)
+				})
+				.collect())
 		};
 
 		Self {
@@ -190,7 +181,7 @@ impl Microservice {
 			let read_config_host = config_host.clone();
 			let read_microservice_name = microservice_name.clone();
 
-			let read_file = move |key: &str, id: u64| -> Result<ReadStream, AnyError> {
+			let read_file = move |key: &str, id: u64| -> Result<ReadFile, AnyError> {
 				let bucket = resolve_bucket_name(
 					&read_config_host,
 					&read_microservice_name,
@@ -216,7 +207,7 @@ impl Microservice {
 				guard.write_file(&bucket, id)
 			};
 
-			let outputs = (self.process)(request_id, &read_file, &write_file).await?;
+			let outputs = (self.process)(request_id, &read_file, &write_file)?;
 			{
 				let mut guard = file_context
 					.lock()
@@ -263,7 +254,7 @@ impl RequestFileContext {
 		})
 	}
 
-	fn read_file(&mut self, s3_client: &Client, bucket: &str, id: u64) -> Result<ReadStream, AnyError> {
+	fn read_file(&mut self, s3_client: &Client, bucket: &str, id: u64) -> Result<ReadFile, AnyError> {
 		let bucket_name = bucket.to_string();
 		let object_key = id.to_string();
 		let client = s3_client.clone();
@@ -276,8 +267,11 @@ impl RequestFileContext {
 					.key(&object_key)
 					.send()
 					.await?;
+				let mut stream = response.body.into_async_read();
+				let mut bytes = Vec::new();
+				stream.read_to_end(&mut bytes).await?;
 
-				Ok::<ReadStream, AnyError>(Box::pin(response.body.into_async_read()))
+				Ok::<ReadFile, AnyError>(Box::new(Cursor::new(bytes)))
 			})
 		})
 	}
@@ -318,10 +312,6 @@ impl Drop for RequestFileContext {
 		}
 		let _ = remove_dir_if_exists(&self.root_dir);
 	}
-}
-
-fn normalize_key_component(value: &str) -> String {
-	value.trim_matches('/').to_string()
 }
 
 fn upload_to_s3(

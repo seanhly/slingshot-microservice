@@ -1,22 +1,19 @@
-use slingshot_microservice::{Microservice, ProcessFuture, ReadFileFn, WriteFileFn};
-use std::io::Write;
-use tokio::io::AsyncReadExt;
+use slingshot_microservice::{AnyError, Microservice, ReadFileFn, WriteFileFn};
+use std::io::{Read, Write};
 
-fn process<'a>(
+fn process(
 	request: u64,
-	read_file: &'a ReadFileFn,
-	write_file: &'a WriteFileFn,
-) -> ProcessFuture<'a, String> {
-	Box::pin(async move {
-		let mut input = String::new();
-		let mut reader = read_file("in", request)?;
-		reader.read_to_string(&mut input).await?;
+	read_file: &ReadFileFn,
+	write_file: &WriteFileFn,
+) -> Result<Vec<(u64, String)>, AnyError> {
+	let mut input = String::new();
+	let mut reader = read_file("in", request)?;
+	reader.read_to_string(&mut input)?;
 
-		let mut writer = write_file("out", request)?;
-		writer.write_all(input.as_bytes())?;
+	let mut writer = write_file("out", request)?;
+	writer.write_all(input.as_bytes())?;
 
-		Ok(vec![(request, "case_a".to_string())])
-	})
+	Ok(vec![(request, "case_a".to_string())])
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

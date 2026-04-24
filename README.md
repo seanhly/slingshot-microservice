@@ -47,25 +47,22 @@ cargo build
 
 ```rust
 use slingshot_microservice::Microservice;
-use slingshot_microservice::{ProcessFuture, ReadFileFn, WriteFileFn};
-use std::io::Write;
-use tokio::io::AsyncReadExt;
+use slingshot_microservice::{AnyError, ReadFileFn, WriteFileFn};
+use std::io::{Read, Write};
 
-fn process<'a>(
+fn process(
     request: u64,
-    read_file: &'a ReadFileFn,
-    write_file: &'a WriteFileFn,
-) -> ProcessFuture<'a, String> {
-    Box::pin(async move {
-        let mut input = String::new();
-        let mut reader = read_file("in", request)?;
-        reader.read_to_string(&mut input).await?;
+    read_file: &ReadFileFn,
+    write_file: &WriteFileFn,
+) -> Result<Vec<(u64, String)>, AnyError> {
+    let mut input = String::new();
+    let mut reader = read_file("in", request)?;
+    reader.read_to_string(&mut input)?;
 
-        let mut writer = write_file("out", request)?;
-        writer.write_all(input.as_bytes())?;
+    let mut writer = write_file("out", request)?;
+    writer.write_all(input.as_bytes())?;
 
-        Ok(vec![(request, "case_a".to_string())])
-    })
+    Ok(vec![(request, "case_a".to_string())])
 }
 
 fn main() {
@@ -142,8 +139,8 @@ Within each `process` pass:
 1. `read_file(key, id)` treats `key` as a bucket reference such as `in`, not
     as the canonical bucket name. On first use, the runtime fetches
     `https://{HOSTNAME}/{MICROSERVICE_NAME}/{key}` to resolve the real bucket
-    name, caches that mapping, and then returns an async stream for object
-    `id` in that bucket using the AWS SDK (`get_object(...).body.into_async_read()`).
+    name, caches that mapping, and then returns a synchronous reader for object
+    `id` in that bucket using the AWS SDK.
 2. `write_file(key, id)` resolves `key` through the same cached lookup and
     returns an opened local file handle for writing, staging the output for
     `s3://{resolved_bucket}/{id}`.
