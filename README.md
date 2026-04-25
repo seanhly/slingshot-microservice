@@ -9,9 +9,13 @@ assumptions about a microservice:
 1. A microservice listens to incoming requests on its own dedicated and
    singular queue (RabbitMQ).
 2. Incoming requests are in the form of a 64-bit unsigned integer (`u64`).
-2. Microservices process requests via a `process` function, which takes three
-   arguments: the incoming request (`u64`), a `read_file` function, and a
-   `write_file` function.
+2. Microservices process requests via a `process` function, which takes four
+    arguments: the incoming request (`u64`), a `read_file` function, a
+    `write_file` function, and a database ORM `connection`.
+3. All microservices must communicate with the shared PostgreSQL database via
+    an ORM connection passed into `process`.
+    - Rust microservices use `diesel::pg::PgConnection`.
+    - Python microservices use `sqlalchemy.engine.base.Connection`.
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
    with a "case variable" that is used for routing the result to the
@@ -75,6 +79,7 @@ pip install -e .
 
 ```python
 from typing import Generator
+from sqlalchemy.engine.base import Connection
 
 from slingshot_microservice.typing import ReadFileFn, WriteFileFn
 from slingshot_microservice import Microservice
@@ -84,6 +89,7 @@ def process(
     request: int,
     read_file: ReadFileFn,
     write_file: WriteFileFn,
+    connection: Connection,
 ) -> Generator[tuple[int, bool | int | str], None, None]:
     reader = read_file("in", request)
     input_data = reader.read().decode()
@@ -107,7 +113,7 @@ editors and type-checkers:
 |---|---|
 | `ReadFileFn` | Callable returned by `read_file(key, id)` – behaves like `BinaryIO` |
 | `WriteFileFn` | Callable returned by `write_file(key, id)` – behaves like `BinaryIO` |
-| `ProcessFn` | The generator function signature expected by `Microservice` |
+| `ProcessFn` | The generator signature expected by `Microservice` with `(request, read_file, write_file, connection)` |
 | `CaseVariable` | `bool \| int \| str` – valid case variable types |
 
 ### Publishing Wheels
@@ -128,6 +134,7 @@ Linux wheel covers all CPython versions ≥ 3.8.
 
 ```rust
 use slingshot_microservice::Microservice;
+use diesel::pg::PgConnection;
 use slingshot_microservice::{AnyError, ReadFileFn, WriteFileFn};
 use std::io::{Read, Write};
 
@@ -135,6 +142,7 @@ fn process(
     request: u64,
     read_file: &ReadFileFn,
     write_file: &WriteFileFn,
+    connection: &mut PgConnection,
 ) -> Result<Vec<(u64, String)>, AnyError> {
     let mut input = String::new();
     let mut reader = read_file("in", request)?;
@@ -213,7 +221,8 @@ actual secrets with `pass show <key>` before constructing the S3 client.
 When the microservice first starts up, it makes a request to the configuration
 service to get the queue metadata.  Then it starts to listen to the inbound
 queue.  Inbound requests are processed by the user-programmed `process`
-function, which returns a set of tuples of the form `(result_id, case_variable)`.
+function, which is called with `(request, read_file, write_file, connection)`
+and returns a set of tuples of the form `(result_id, case_variable)`.
 
 Within each `process` pass:
 
@@ -225,17 +234,20 @@ Within each `process` pass:
 2. `write_file(key, id)` resolves `key` through the same cached lookup and
     returns an opened local file handle for writing, staging the output for
     `s3://{resolved_bucket}/{id}`.
-3.  After `process` returns, opened files are closed.
-4.  Then staged write files are uploaded to S3 with the AWS SDK, local staged
+3. `connection` is an ORM-backed PostgreSQL connection passed into `process`
+    (`diesel::pg::PgConnection` in Rust, `sqlalchemy.engine.base.Connection`
+    in Python).
+4.  After `process` returns, opened files are closed.
+5.  Then staged write files are uploaded to S3 with the AWS SDK, local staged
     files are deleted, and local temporary directories are removed.
-5.  Only after file finalization is complete are output IDs published to
+6.  Only after file finalization is complete are output IDs published to
     outbound queues.
 
 The output queue routing step looks like this:
 
 Peudocode:
 ```
-for each (result_id, case_variable) in process(request):
+for each (result_id, case_variable) in process(request, read_file, write_file, connection):
     for each outbound_queue in config.out[case_variable]:
         send result_id to outbound_queue
 ```

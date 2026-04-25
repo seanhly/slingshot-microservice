@@ -4,11 +4,14 @@ build-backend = "maturin"
 
 [project]
 name = "slingshot-microservice"
-version = "0.1.0"
+version = "0.1.2"
 description = "Opinionated Rust framework for queue-driven microservices"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 readme = "README.md"
+dependencies = [
+	"sqlalchemy>=2",
+]
 authors = [
 	{ name = "Seán Healy", email = "sean@seanhealy.ie" }
 ]

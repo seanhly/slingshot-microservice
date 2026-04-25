@@ -1,11 +1,13 @@
 from slingshot_microservice.typing import ReadFileFn, WriteFileFn
 from slingshot_microservice import Microservice
 from typing import Generator
+from sqlalchemy.engine.base import Connection
 
 def process(
 	request: int,
 	read_file: ReadFileFn,
 	write_file: WriteFileFn,
+	_connection: Connection,
 ) -> Generator[tuple[int, bool | int | str], None, None]:
 	reader = read_file("in", request)
 	input_data = reader.read().decode()

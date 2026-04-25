@@ -1,10 +1,12 @@
 use slingshot_microservice::{AnyError, Microservice, ReadFileFn, WriteFileFn};
+use diesel::pg::PgConnection;
 use std::io::{Read, Write};
 
 fn process(
 	request: u64,
 	read_file: &ReadFileFn,
 	write_file: &WriteFileFn,
+	_connection: &mut PgConnection,
 ) -> Result<Vec<(u64, String)>, AnyError> {
 	let mut input = String::new();
 	let mut reader = read_file("in", request)?;
