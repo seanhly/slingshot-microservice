@@ -188,6 +188,7 @@ impl Microservice {
 					&read_bucket_cache,
 					key,
 				)?;
+				info!("Resolved bucket name for key '{}': {}", key, bucket);
 				let mut guard = read_context
 					.lock()
 					.map_err(|e| format!("file context lock poisoned for read_file: {}", e))?;
