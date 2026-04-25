@@ -9,6 +9,9 @@ description = "Opinionated Rust framework for queue-driven microservices"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 readme = "README.md"
+authors = [
+	{ name = "Seán Healy", email = "sean@seanhealy.ie" }
+]
 
 [tool.maturin]
 # Build with Python bindings enabled.
@@ -17,3 +20,7 @@ features = ["python"]
 module-name = "slingshot_microservice._native"
 # Include the pure-Python package (typing stubs, __init__.py) in the wheel.
 python-packages = ["slingshot_microservice"]
+
+[project.urls]
+"Source Code" = "https://codeberg.org/seanhly/slingshot-microservice"
+"Homepage" = "https://www.seanhealy.ie/projects/slingshot-microservice.html"
