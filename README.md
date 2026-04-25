@@ -20,11 +20,11 @@ assumptions about a microservice:
 4. Rather than hard-coding the inbound and outbound queues, the
    microservice communicates with a self-contained configuration service shared
    across all microservices.
-   i.  This service provides inbound queue name, as well as any outbound queues
-       and their corresponding case variables.
-   ii. It is also responsible for providing the RabbitMQ connection details
-	   (host, port, username, password), and the object-storage host plus GNU
-	   `pass` references for the S3 access key and secret key.
+   - This service provides inbound queue name, as well as any outbound queues
+     and their corresponding case variables.
+   - It is also responsible for providing the RabbitMQ connection details
+	 (host, port, username, password), and the object-storage host plus GNU
+	 `pass` references for the S3 access key and secret key.
 
 The `slingshot-microservice` framework handles setting up the RabbitMQ
 connection, listening to the inbound queue and routing results based on case variables.
