@@ -170,6 +170,8 @@ impl Microservice {
 				}
 			};
 
+			info!("Received request ID {} from queue.", request_id);
+
 			let file_context = Arc::new(Mutex::new(RequestFileContext::new(request_id)?));
 			let read_context = Arc::clone(&file_context);
 			let write_context = Arc::clone(&file_context);
