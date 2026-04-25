@@ -217,7 +217,6 @@ impl Microservice {
 					.map_err(|e| format!("file context lock poisoned for finalize: {}", e))?;
 				guard.finalize(s3_client.as_ref())?
 			}
-
 			publish_outputs(&channel, outputs, &route_map).await?;
 			delivery.ack(BasicAckOptions::default()).await?;
 		}
@@ -562,6 +561,7 @@ async fn publish_outputs(
 	route_map: &HashMap<String, Vec<String>>,
 ) -> Result<(), AnyError> {
 	for (result_id, case_var) in outputs {
+		info("Shuttle output result_id={}, case_var={}", result_id, case_var);
 		if let Some(outbound_queues) = route_map.get(&case_key(&case_var)) {
 			for queue in outbound_queues {
 				let payload = result_id.to_string();
