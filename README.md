@@ -46,9 +46,32 @@ cargo build
 
 ## Python Usage
 
-This crate also exposes Python bindings behind the Cargo feature `python`.
-The Python callback receives a request ID plus callable `read_file` and
-`write_file` helpers and should yield tuples of `(result_id, case_variable)`.
+`slingshot-microservice` ships Python bindings built with
+[PyO3](https://pyo3.rs) and [maturin](https://www.maturin.rs).  Pre-built
+ABI3 wheels work on Python ≥ 3.8 without requiring Rust locally.
+
+### Installing
+
+**From PyPI** (once published):
+
+```bash
+pip install slingshot-microservice
+```
+
+**From git** (Rust toolchain required):
+
+```bash
+pip install git+https://codeberg.org/seanhly/slingshot-microservice
+```
+
+**From a local clone** (for development):
+
+```bash
+pip install maturin
+pip install -e .
+```
+
+### Usage
 
 ```python
 from typing import Generator
@@ -75,16 +98,31 @@ microservice = Microservice("simple-py-microservice", "sys-map.slingshot.cv", pr
 microservice.start()
 ```
 
-### Building The Python Extension
+### Type Annotations
 
-Build with:
+`slingshot_microservice.typing` exports `Protocol`-based types for use in
+editors and type-checkers:
+
+| Symbol | Description |
+|---|---|
+| `ReadFileFn` | Callable returned by `read_file(key, id)` – behaves like `BinaryIO` |
+| `WriteFileFn` | Callable returned by `write_file(key, id)` – behaves like `BinaryIO` |
+| `ProcessFn` | The generator function signature expected by `Microservice` |
+| `CaseVariable` | `bool \| int \| str` – valid case variable types |
+
+### Publishing Wheels
+
+Build and upload to PyPI using maturin:
 
 ```bash
-cargo build --release --features python
+pip install maturin
+maturin publish
 ```
 
-The generated shared library can then be imported by Python as
-`slingshot_microservice`.
+For CI/cross-compilation (Linux, macOS, Windows), use
+[maturin-action](https://github.com/PyO3/maturin-action) in GitHub/Codeberg
+Actions.  Because the extension is compiled with ABI3 (`abi3-py38`), a single
+Linux wheel covers all CPython versions ≥ 3.8.
 
 ## Example Usage
 
