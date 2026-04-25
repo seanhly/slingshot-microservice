@@ -1,5 +1,5 @@
 use slingshot_microservice::{AnyError, Microservice, ReadFileFn, WriteFileFn};
-use diesel::pg::PgConnection;
+use diesel::PgConnection;
 use std::io::{Read, Write};
 
 fn process(

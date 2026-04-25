@@ -15,7 +15,7 @@ use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{Credentials, Region};
 use aws_sdk_s3::primitives::ByteStream;
 use diesel::Connection as DieselConnection;
-use diesel::pg::PgConnection;
+use diesel::PgConnection;
 use futures_util::StreamExt;
 use lapin::options::{
 	BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,

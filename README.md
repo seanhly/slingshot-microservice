@@ -14,7 +14,7 @@ assumptions about a microservice:
     `write_file` function, and a database ORM `connection`.
 3. All microservices must communicate with the shared PostgreSQL database via
     an ORM connection passed into `process`.
-    - Rust microservices use `diesel::pg::PgConnection`.
+    - Rust microservices use `diesel::PgConnection`.
     - Python microservices use `sqlalchemy.engine.base.Connection`.
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
@@ -134,7 +134,7 @@ Linux wheel covers all CPython versions ≥ 3.8.
 
 ```rust
 use slingshot_microservice::Microservice;
-use diesel::pg::PgConnection;
+use diesel::PgConnection;
 use slingshot_microservice::{AnyError, ReadFileFn, WriteFileFn};
 use std::io::{Read, Write};
 
@@ -235,7 +235,7 @@ Within each `process` pass:
     returns an opened local file handle for writing, staging the output for
     `s3://{resolved_bucket}/{id}`.
 3. `connection` is an ORM-backed PostgreSQL connection passed into `process`
-    (`diesel::pg::PgConnection` in Rust, `sqlalchemy.engine.base.Connection`
+    (`diesel::PgConnection` in Rust, `sqlalchemy.engine.base.Connection`
     in Python).
 4.  After `process` returns, opened files are closed.
 5.  Then staged write files are uploaded to S3 with the AWS SDK, local staged
