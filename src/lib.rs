@@ -525,7 +525,19 @@ fn bucket_mapping_url(host: &str, microservice_name: &str, key: &str) -> String 
 fn build_route_map(outbound: &[OutboundCase]) -> Result<HashMap<CaseKey, Vec<String>>, AnyError> {
 	let mut map = HashMap::new();
 	for entry in outbound {
-		map.insert(case_key_from_value(&entry.case_value)?, entry.queues.clone());
+		let case_key: CaseKey = case_key_from_value(&entry.case_value)?;
+		let case_type = match &case_key {
+			CaseKey::Bool(_) => "bool",
+			CaseKey::Int(_) => "int",
+			CaseKey::String(_) => "string",
+		};
+		let case_key_str = match &case_key {
+			CaseKey::Bool(value) => value.to_string(),
+			CaseKey::Int(value) => value.to_string(),
+			CaseKey::String(value) => value.clone(),
+		};
+		info!("Case variable with type:{} and value:{} maps to queues: {:?}", case_type, case_key_str, entry.queues);
+		map.insert(case_key, entry.queues.clone());
 	}
 	Ok(map)
 }
@@ -584,6 +596,7 @@ async fn publish_outputs(
 		info!("Shuttle output result_id={}, case_var={:?}", result_id, case_var);
 		if let Some(outbound_queues) = route_map.get(&case_var) {
 			for queue in outbound_queues {
+				info!("Publishing result ID {} to queue '{}' for case variable {:?}", result_id, queue, case_var);
 				let payload = result_id.to_string();
 				let confirm = channel
 					.basic_publish(
