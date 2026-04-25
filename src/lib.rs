@@ -270,7 +270,13 @@ impl RequestFileContext {
 					.bucket(&bucket_name)
 					.key(&object_key)
 					.send()
-					.await?;
+					.await
+					.map_err(|e| {
+						format!(
+							"failed to get S3 object bucket='{}' key='{}': {:?}",
+							bucket_name, object_key, e
+						)
+					})?;
 				let mut stream = response.body.into_async_read();
 				let mut bytes = Vec::new();
 				stream.read_to_end(&mut bytes).await?;
@@ -415,13 +421,14 @@ async fn fetch_s3_client_from_sys_map() -> Result<Arc<Client>, AnyError> {
 			secret_key,
 			None,
 			None,
-			"sys-map",
+			"pass",
 		))
 		.load()
 		.await;
 
 	let s3_config = aws_sdk_s3::config::Builder::from(&shared_config)
 		.endpoint_url(format!("https://{}", host))
+		.force_path_style(true)
 		.build();
 
 	Ok(Arc::new(Client::from_conf(s3_config)))
