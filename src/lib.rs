@@ -264,6 +264,7 @@ impl RequestFileContext {
 
 		tokio::task::block_in_place(|| {
 			tokio::runtime::Handle::current().block_on(async move {
+				info!("Reading file from S3 - bucket: '{}', key: '{}'", bucket_name, object_key);
 				let response = client
 					.get_object()
 					.bucket(&bucket_name)
@@ -460,6 +461,8 @@ fn resolve_bucket_name(
 
 fn resolve_password_from_pass(pass_key: &str) -> Result<String, AnyError> {
 	let output = Command::new("pass").arg("show").arg(pass_key).output()?;
+
+	info!("Resolving GNU pass entry '{}'", pass_key);
 
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
