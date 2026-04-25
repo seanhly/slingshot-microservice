@@ -409,7 +409,7 @@ async fn fetch_s3_client_from_sys_map() -> Result<Arc<Client>, AnyError> {
 	info!("Fetched object storage config from sys-map: host={}", host);
 
 	let shared_config = aws_config::defaults(BehaviorVersion::latest())
-		.region(Region::new("us-east-1"))
+		.region(Region::new("garage"))
 		.credentials_provider(Credentials::new(
 			access_key,
 			secret_key,
