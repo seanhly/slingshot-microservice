@@ -10,12 +10,13 @@ assumptions about a microservice:
    singular queue (RabbitMQ).
 2. Incoming requests are in the form of a 64-bit unsigned integer (`u64`).
 2. Microservices process requests via a `process` function, which takes three
-    arguments: the incoming request (`u64`), a `read_file` function, and a
-    `write_file` function.
+   arguments: the incoming request (`u64`), a `read_file` function, and a
+   `write_file` function.
 3. The `process` function returns a set of IDs (also `u64`) that are the result
    of processing the incoming request.  Each of these IDs is also associated
    with a "case variable" that is used for routing the result to the
-   appropriate outbound queues.
+   appropriate outbound queues. Case variables for routing must be one of:
+   boolean, integer, or string.
 4. Rather than hard-coding the inbound and outbound queues, the
    microservice communicates with a self-contained configuration service shared
    across all microservices.
@@ -101,7 +102,7 @@ and a mapping of case variables to outbound queue names. For example:
 }
 ```
 
-The case variables can be any primitive type (e.g. string, integer, boolean).
+The case variables used for routing can be one of: string, integer, or boolean.
 E.g. a binary classification microservice might decide on which outbound queue
 to send results to based on a case variable that is either `false` or `true`:
 
