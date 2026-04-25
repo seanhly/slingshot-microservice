@@ -44,6 +44,48 @@ Then fetch and build dependencies:
 cargo build
 ```
 
+## Python Usage
+
+This crate also exposes Python bindings behind the Cargo feature `python`.
+The Python callback receives a request ID plus callable `read_file` and
+`write_file` helpers and should yield tuples of `(result_id, case_variable)`.
+
+```python
+from typing import Generator
+
+from slingshot_microservice.typing import ReadFileFn, WriteFileFn
+from slingshot_microservice import Microservice
+
+
+def process(
+    request: int,
+    read_file: ReadFileFn,
+    write_file: WriteFileFn,
+) -> Generator[tuple[int, bool | int | str], None, None]:
+    reader = read_file("in", request)
+    input_data = reader.read().decode()
+
+    writer = write_file("out", request)
+    writer.write(f"Hello {input_data}".encode())
+
+    yield (request, True)
+
+
+microservice = Microservice("simple-py-microservice", "sys-map.slingshot.cv", process)
+microservice.start()
+```
+
+### Building The Python Extension
+
+Build with:
+
+```bash
+cargo build --release --features python
+```
+
+The generated shared library can then be imported by Python as
+`slingshot_microservice`.
+
 ## Example Usage
 
 ```rust

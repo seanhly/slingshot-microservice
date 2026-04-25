@@ -5,6 +5,13 @@ edition = "2021"
 description = "Opinionated Rust framework for queue-driven microservices"
 license = "MIT"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+python = ["dep:pyo3"]
+
 [dependencies]
 aws-config = "1"
 aws-sdk-s3 = "1"
@@ -16,6 +23,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+pyo3 = { version = "0.23", optional = true, features = ["extension-module", "abi3-py38"] }
 
 [dev-dependencies]
 anyhow = "1"
