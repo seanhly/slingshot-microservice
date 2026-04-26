@@ -802,14 +802,23 @@ struct PyWriteHandle {
 #[cfg(feature = "python")]
 #[pymethods]
 impl PyWriteHandle {
-	fn write(&self, data: &[u8]) -> PyResult<usize> {
+	fn write(&self, data: &Bound<'_, PyAny>) -> PyResult<usize> {
+		let (buffer, chars_written) = if let Ok(bytes) = data.extract::<Vec<u8>>() {
+			(bytes, None)
+		} else if let Ok(text) = data.extract::<String>() {
+			let char_count = text.chars().count();
+			(text.into_bytes(), Some(char_count))
+		} else {
+			return Err(PyTypeError::new_err("write() argument must be bytes or str"));
+		};
+
 		let mut file = self
 			.file
 			.lock()
 			.map_err(|e| PyRuntimeError::new_err(format!("write lock poisoned: {}", e)))?;
-		file.write_all(data)
+		file.write_all(&buffer)
 			.map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-		Ok(data.len())
+		Ok(chars_written.unwrap_or(buffer.len()))
 	}
 
 	fn flush(&self) -> PyResult<()> {

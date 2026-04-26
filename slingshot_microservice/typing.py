@@ -15,7 +15,12 @@ class ReadFileFn(Protocol):
 
 
 class WriteFileFn(Protocol):
-    def __call__(self, key: str, id: int) -> BinaryIO: ...
+    def __call__(self, key: str, id: int) -> "WriteHandle": ...
+
+
+class WriteHandle(Protocol):
+    def write(self, data: bytes | str) -> int: ...
+    def flush(self) -> None: ...
 
 
 class ProcessFn(Protocol):
@@ -31,6 +36,7 @@ class ProcessFn(Protocol):
 __all__ = [
     "CaseVariable",
     "ReadFileFn",
+    "WriteHandle",
     "WriteFileFn",
     "ProcessFn",
 ]
