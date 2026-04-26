@@ -502,7 +502,7 @@ fn fetch_database_url_from_sys_map() -> Result<String, AnyError> {
 	);
 
 	Ok(format!(
-		"postgres://{}:{}@{}:{}/{}",
+		"postgresql://{}:{}@{}:{}/{}",
 		username, password, host, port, database
 	))
 }
